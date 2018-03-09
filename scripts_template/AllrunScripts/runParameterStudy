@@ -1,0 +1,11 @@
+#!/bin/bash
+
+PWD=`pwd`
+
+for d in `find $PWD -maxdepth 1 -type d`
+do 
+        echo " "
+        echo "Current case: $d"
+        cd $d
+        bash ./Allrun
+done
