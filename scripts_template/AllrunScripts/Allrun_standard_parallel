@@ -1,0 +1,90 @@
+#!/bin/sh
+
+foamextend4
+
+cd ${0%/*} || exit 1    # Run from this directory
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+application=`getApplication`
+
+# Goal: Finding the higest number at the end of the log file
+# Two regex comparisons are performed.
+ # The first finds all log solver log files
+ # The second gets the numbers at the end of the log files
+
+regex0="*"
+regex1="(log_${application}_+[^.][0-9]*)"
+regex2="[0-9]+"
+
+numbers=() 			# Array that holds the numbers of the log files
+
+# Writing the log file numbers in the numbers-Array
+for f in `find . -maxdepth 1 -name "$regex0"`
+do 
+	if  [[ $f =~ $regex1 ]]
+	then 
+		# the =~ operator writes the comparison result into
+		# the variable BASH_REMATCH		
+		name="${BASH_REMATCH[0]}" 
+	fi
+
+	if  [[ $name =~ $regex2 ]]
+	then 
+		name2="${BASH_REMATCH[0]}"
+		numbers+=($name2)
+	fi
+done
+
+# Getting the higest number from the array
+
+higestNumber() {
+	logFileCounter=0
+	for i in "${numbers[@]}"
+	do 
+		if (("$i" >= "$logFileCounter")) 
+		then
+			logFileCounter=$i
+		fi
+	done
+	echo $logFileCounter
+}
+
+# Reading the number of processors specified in the decomposeParDict
+Procs=`grep 'numberOfSubdomains' ./system/decomposeParDict -R | cut -d ' ' -f 2 | sed 's/\;//g'`
+
+# Saving the previous simulation log file
+	# Using the arithmetic expansion opertor: $((...)) to cast string to int
+	# adding 1 to the previous log file counter
+nextLogNumber=$(($(higestNumber)+1))
+newLogName="log_${application}_${nextLogNumber}"
+mv "log.${application}" "$newLogName"
+
+# Be sure the time steps are reconstructed before deleting them
+#rm -vrf log.reconstructPar
+#foam4
+#runApplication reconstructPar -newTimes
+#rm -rf processor*
+# Removing the previous simulation log files
+rm -vrf log.*
+
+
+
+# Executing the simulation commands
+runApplication decomposePar
+echo "mpirun -np $Procs $application -parallel > log.$application"
+mpirun -np $Procs $application -parallel > log.$application
+foam4
+runApplication reconstructPar -newTimes
+
+#foamextend4
+#foamCalcEx mag tau > log.magTau
+#foamCalcEx average magtau > log.avgMagTau
+
+#VALUE=`grep 'Calculating average(magtau)' ./log.avgMagTau | cut -d ' ' -f 15`
+#TIME=`grep 'Create mesh for time' ./log.avgMagTau | cut -d ' ' -f 6`
+
+#touch results.csv
+#echo "t,avgMagTau" >> results.csv
+#echo "$TIME,$VALUE" >> results.csv

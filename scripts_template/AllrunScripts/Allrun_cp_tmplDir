@@ -1,0 +1,28 @@
+#!/bin/sh
+
+
+cd ${0%/*} || exit 1    # Run from this directory
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+application=`getApplication`
+
+rm -vrf log.*
+rm -rf processor*
+
+startTime=`find . -type d -name "template*" | sed 's/template_//g' | sed 's/_/./g'`
+cp -r template_* $startTime
+
+Procs=`grep 'numberOfSubdomains' ./system/decomposeParDict -R | cut -d ' ' -f 2 | sed 's/\;//g'`
+
+runApplication decomposePar -latestTime
+echo "mpirun -np $Procs $application -parallel > log.$application"
+mpirun -np $Procs $application -parallel > log.$application 2> log.errorLog
+        if [ $? -eq 0 ]
+        then
+                echo "Successfully finished the simulation"
+        else
+                echo "Simulation finished with an error" >&2
+        fi
+runApplication reconstructPar -latestTime
